@@ -1,0 +1,27 @@
+# Local build/runtime
+.last_update
+server.log
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# System
+.DS_Store
+*.log
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+dist/
+
+# Local editor config
+.claude/

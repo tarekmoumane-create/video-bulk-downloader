@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Bulk Video Downloader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0b0d;
+    --panel: #121215;
+    --raise: #19191d;
+    --line: rgba(255,255,255,.08);
+    --line-strong: rgba(255,255,255,.16);
+    --ink: #f5f5f7;
+    --muted: #8a8a93;
+    --dim: #5b5b63;
+    --white: #ffffff;
+    --ok: #34d399;
+    --bad: #f87171;
+    --cyan: #25f4ee;
+    --pink: #fe2c55;
+    --font: "Geist", -apple-system, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font);
+         -webkit-font-smoothing: antialiased; }
+  main { max-width: 1040px; margin: 0 auto; padding: 72px 24px 120px; }
+  button, input, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--white); outline-offset: 3px; border-radius: 4px; }
+
+  /* header */
+  h1 { font-size: clamp(34px, 5vw, 52px); font-weight: 500; letter-spacing: -0.04em; line-height: 1.02; margin: 0; }
+  .lede { color: var(--muted); font-size: 15px; margin: 14px 0 40px; max-width: 46ch; }
+
+  /* input stage */
+  .stage { max-width: 720px; }
+  .sources { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 8px;
+             background: var(--panel); margin-bottom: 14px; }
+  .tab { background: none; border: 0; border-radius: 6px; padding: 7px 14px; color: var(--muted); font-weight: 500;
+         font-size: 14px; cursor: pointer; transition: color .15s, background .15s; }
+  .tab:hover { color: var(--ink); }
+  .tab.on { background: var(--raise); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+
+  .panel { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow: hidden; }
+  .pane { display: none; padding: 6px; }
+  .pane.on { display: block; }
+
+  textarea, input[type=text] { display: block; width: 100%; background: transparent; border: 0; padding: 16px 16px;
+         outline: none; color: var(--ink); }
+  textarea { min-height: 220px; resize: vertical; line-height: 1.7; }
+  textarea::placeholder, input::placeholder { color: var(--dim); }
+
+  .sheet-row { display: flex; align-items: center; gap: 6px; }
+  .sheet-row input { flex: 1; min-width: 0; }
+  .hint { color: var(--dim); font-size: 13px; margin: 0; padding: 0 16px 14px; max-width: 64ch; }
+  .sheet-hint { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 12px; }
+
+  .drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+          min-height: 220px; margin: 0; border: 1px dashed var(--line-strong); border-radius: 8px;
+          color: var(--muted); text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+  .drop b { color: var(--ink); font-weight: 500; }
+  .drop:hover, .drop.over { border-color: var(--ink); background: var(--raise); }
+  .drop:focus-within { outline: 2px solid var(--white); outline-offset: 3px; }
+
+  .btn { border: 1px solid var(--line); border-radius: 8px; padding: 9px 14px; font-weight: 500; font-size: 14px;
+         background: transparent; color: var(--ink); cursor: pointer; white-space: nowrap;
+         transition: background .15s, border-color .15s, opacity .15s; }
+  .btn:hover { background: var(--raise); border-color: var(--line-strong); }
+  .btn.primary { background: var(--white); color: #000; border-color: var(--white); padding: 11px 20px; }
+  .btn.primary:hover { background: #e8e8ea; border-color: #e8e8ea; }
+  .btn:disabled { opacity: .35; cursor: default; }
+  .btn:disabled:hover { background: transparent; }
+  .btn.primary:disabled { opacity: 1; background: var(--raise); color: var(--dim); border-color: var(--line); }
+
+  .go-row { display: flex; align-items: center; justify-content: space-between; gap: 16px;
+            padding: 14px 16px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+  .count { color: var(--muted); font-size: 14px; }
+  .count strong { color: var(--ink); font-weight: 500; }
+  .msg { color: var(--bad); font-size: 14px; margin: 12px 2px 0; }
+  .msg:empty { display: none; }
+
+  /* results */
+  #results { display: none; margin-top: 72px; }
+  .results-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+                  margin-bottom: 16px; }
+  #status { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; }
+  #status span { color: var(--bad); }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  a.btn { text-decoration: none; display: inline-block; }
+  .btn.drive-done { border-color: var(--ok); color: var(--ok); }
+  .btn.drive-done:hover { background: rgba(52,211,153,.1); }
+  #driveMsg { margin: 0 0 12px; }
+  .progress { height: 2px; background: var(--line); border-radius: 2px; overflow: hidden; margin-bottom: 28px; }
+  .progress i { display: block; height: 100%; width: 0; transition: width .5s ease;
+                background: linear-gradient(90deg, var(--cyan), var(--pink)); }
+
+  #list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); gap: 24px 16px; }
+  .clip { display: block; width: 100%; min-width: 0; background: none; border: 0; padding: 0; text-align: left; cursor: default; }
+  .clip[data-file] { cursor: pointer; }
+  .frame { position: relative; aspect-ratio: 9 / 16; border-radius: 8px; overflow: hidden; background: var(--panel);
+           border: 1px solid var(--line); transition: border-color .15s, transform .2s; }
+  .frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .clip[data-file]:hover .frame { border-color: var(--line-strong); transform: translateY(-2px); }
+  .badge { position: absolute; left: 8px; bottom: 8px; font-size: 11px; font-weight: 500; letter-spacing: .01em;
+           padding: 3px 7px; border-radius: 5px; color: var(--white);
+           background: rgba(0,0,0,.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .state { position: absolute; inset: 0; display: grid; place-items: center; padding: 14px; text-align: center;
+           font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+  .clip.downloading .frame { border-color: transparent; background:
+      linear-gradient(var(--panel), var(--panel)) padding-box,
+      linear-gradient(140deg, var(--cyan), var(--pink), var(--cyan)) border-box;
+      background-size: 100% 100%, 200% 200%; animation: sweep 2.2s linear infinite; }
+  .clip.failed .frame { border-color: rgba(248,113,113,.4); }
+  .clip.failed .state { color: var(--bad); }
+  @keyframes sweep { to { background-position: 0 0, 200% 200%; } }
+  .cap { margin-top: 10px; font-size: 13px; line-height: 1.4; }
+  .cap .who { color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cap .spec { color: var(--dim); font-size: 12px; }
+
+  @media (max-width: 560px) {
+    main { padding: 40px 16px 80px; }
+    .sources { display: flex; }
+    .tab { flex: 1; padding: 7px 8px; }
+    .sheet-row { flex-direction: column; align-items: stretch; padding: 0 10px 10px; }
+    .go-row .btn.primary { width: 100%; }
+    #list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .clip.downloading .frame { animation: none; }
+    .progress i, .frame { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Download videos in bulk.</h1>
+  <p class="lede">TikTok, Instagram, YouTube. Full quality, no watermark. Saved to Downloads › Videos, and to Google Drive if you want.</p>
+
+  <div class="stage">
+    <div class="sources" role="tablist">
+      <button class="tab on" data-pane="paste" role="tab">Paste links</button>
+      <button class="tab" data-pane="sheet" role="tab">Google Sheet</button>
+      <button class="tab" data-pane="file" role="tab">Upload file</button>
+    </div>
+
+    <section class="panel">
+      <div class="pane on" id="paste">
+        <textarea id="pasteBox" aria-label="Video links" placeholder="Paste TikTok, Instagram, or YouTube links, one per line. Messy text is fine, the links get picked out."></textarea>
+      </div>
+
+      <div class="pane" id="sheet">
+        <div class="sheet-row">
+          <input type="text" id="sheetUrl" aria-label="Google Sheet link" placeholder="Paste a Google Sheet link">
+          <button class="btn" id="sheetBtn">Find links</button>
+        </div>
+        <p class="hint sheet-hint">The sheet needs to be shared as "Anyone with the link", or live in your own Google account. Video links are found for you.</p>
+      </div>
+
+      <div class="pane" id="file">
+        <label class="drop" id="drop">
+          <b>Drop a CSV or Excel file</b>
+          <span>or click to choose one</span>
+          <input type="file" id="fileInput" accept=".csv,.xlsx,.xlsm,.txt,.tsv" hidden>
+        </label>
+        <p class="hint" style="padding-top:12px">From Google Sheets: File, then Download, then CSV.</p>
+      </div>
+
+      <div class="go-row">
+        <div class="count" id="count"><strong>0</strong> videos found</div>
+        <button class="btn primary" id="go" disabled>Download videos</button>
+      </div>
+    </section>
+    <p class="msg" id="msg" role="alert"></p>
+  </div>
+
+  <section id="results" aria-live="polite">
+    <div class="results-head">
+      <div id="status">Starting</div>
+      <div class="actions">
+        <button class="btn" id="retry" hidden>Retry failed</button>
+        <button class="btn" id="openFolder">Open folder</button>
+        <button class="btn" id="drive" hidden>Save to Google Drive</button>
+        <a class="btn drive-done" id="driveLink" target="_blank" rel="noopener" hidden>Open in Google Drive</a>
+      </div>
+    </div>
+    <p class="msg" id="driveMsg" role="alert"></p>
+    <div class="progress"><i id="prog"></i></div>
+    <div id="list"></div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const VIDEO_RE = /https?:\/\/(?:(?:www|m)\.)?tiktok\.com\/(?:@[\w.-]+\/(?:video|photo)\/\d+|t\/\w+|v\/\d+)|https?:\/\/(?:vm|vt)\.tiktok\.com\/\w+|https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel|tv|stories|igtv)\/[\w-]+|https?:\/\/(?:www\.)?youtube\.com\/watch\?v=[\w-]+|https?:\/\/(?:www\.)?youtube\.com\/shorts\/[\w-]+|https?:\/\/youtu\.be\/[\w-]+/gi;
+let pane = "paste", sources = { paste: [], sheet: [], file: [] }, job = null, timer = null;
+
+function uniq(list) {
+  const seen = new Set();
+  return list.filter((u) => { const k = u.toLowerCase().replace(/\/$/, ""); return seen.has(k) ? false : seen.add(k); });
+}
+function links() { return sources[pane]; }
+function plural(n) { return `video${n === 1 ? "" : "s"}`; }
+function refresh() {
+  const n = links().length;
+  $("count").innerHTML = `<strong>${n}</strong> ${plural(n)} found`;
+  $("go").textContent = n ? `Download ${n} ${plural(n)}` : "Download videos";
+  $("go").disabled = n === 0;
+}
+function say(text) { $("msg").textContent = text || ""; }
+
+document.querySelectorAll(".tab").forEach((t) => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("on", x === t));
+  document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("on", p.id === t.dataset.pane));
+  pane = t.dataset.pane; say(""); refresh();
+});
+
+$("pasteBox").addEventListener("input", () => {
+  sources.paste = uniq($("pasteBox").value.match(VIDEO_RE) || []); refresh();
+});
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, opts);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || "The tool stopped responding. Close the tab and open the app again.");
+  return data;
+}
+
+$("sheetBtn").onclick = async () => {
+  const url = $("sheetUrl").value.trim();
+  if (!url) return say("Paste a Google Sheet link first.");
+  $("sheetBtn").disabled = true; $("sheetBtn").textContent = "Reading sheet"; say("");
+  try {
+    const data = await api("/api/sheet", { method: "POST", body: JSON.stringify({ url }) });
+    sources.sheet = data.links;
+    if (!data.links.length) say("No video links found in that sheet.");
+  } catch (e) { sources.sheet = []; say(e.message); }
+  $("sheetBtn").disabled = false; $("sheetBtn").textContent = "Find links"; refresh();
+};
+$("sheetUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") $("sheetBtn").click(); });
+
+const dropTitle = () => $("drop").querySelector("b");
+async function handleFile(f) {
+  if (!f) return;
+  say(""); dropTitle().textContent = `Reading ${f.name}`;
+  try {
+    const data = await api("/api/file", { method: "POST", headers: { "X-Filename": f.name }, body: await f.arrayBuffer() });
+    sources.file = data.links;
+    dropTitle().textContent = f.name;
+    if (!data.links.length) say("No video links found in that file.");
+  } catch (e) { sources.file = []; say(e.message); dropTitle().textContent = "Drop a CSV or Excel file"; }
+  refresh();
+}
+$("fileInput").onchange = (e) => handleFile(e.target.files[0]);
+const drop = $("drop");
+["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", (e) => handleFile(e.dataTransfer.files[0]));
+
+$("go").onclick = async () => {
+  say(""); $("go").disabled = true;
+  try {
+    job = await api("/api/start", { method: "POST", body: JSON.stringify({ links: links() }) });
+    $("results").style.display = "block";
+    $("results").scrollIntoView({ behavior: "smooth" });
+    render(); clearInterval(timer); timer = setInterval(poll, 1200);
+  } catch (e) { say(e.message); }
+  refresh();
+};
+
+async function poll() {
+  try { job = await api(`/api/job/${job.id}`); render(); } catch (e) {}
+}
+
+function mb(bytes) { return bytes ? (bytes / 1048576).toFixed(1) + " MB" : ""; }
+function esc(s) { return String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function shortUrl(u) { return u.replace(/^https?:\/\/(www\.)?/, ""); }
+function quality(res) { const h = Math.min(...String(res).split("x").map(Number)); return h >= 1080 ? "1080p" : h >= 720 ? "720p" : h ? `${h}p` : ""; }
+
+function tile(i) {
+  const saved = i.status === "done";
+  const inside = saved
+    ? `${i.thumb ? `<img src="${esc(i.thumb)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
+       <span class="badge">${quality(i.res) || "Saved"}</span>`
+    : i.status === "failed" ? `<div class="state">${esc(i.error)}</div>`
+    : i.status === "downloading" ? `<div class="state">Downloading</div>`
+    : `<div class="state">Waiting</div>`;
+  const who = i.creator ? `@${esc(i.creator)}` : esc(shortUrl(i.url));
+  const spec = saved ? `${mb(i.size)}, click to show` : "";
+  return `<button class="clip ${i.status}" ${saved ? `data-file="${esc(i.file)}"` : "tabindex='-1'"} title="${esc(i.title || i.url)}">
+      <div class="frame">${inside}</div>
+      <div class="cap"><div class="who">${who}</div>${spec ? `<div class="spec">${spec}</div>` : ""}</div>
+    </button>`;
+}
+
+function render() {
+  const items = job.items, total = items.length;
+  const done = items.filter((i) => i.status === "done").length;
+  const failed = items.filter((i) => i.status === "failed").length;
+  const finished = done + failed === total;
+  $("prog").style.width = `${((done + failed) / total) * 100}%`;
+  $("status").innerHTML = finished
+    ? `${done} of ${total} saved${failed ? `, <span>${failed} failed</span>` : ""}`
+    : `Downloading ${Math.min(done + failed + 1, total)} of ${total}`;
+  $("retry").hidden = !(finished && failed);
+  renderDrive(finished, done);
+  if (finished && !driveBusy()) clearInterval(timer);
+  $("list").innerHTML = items.map(tile).join("");
+}
+
+function driveBusy() { return job.drive && job.drive.status === "uploading"; }
+function renderDrive(finished, done) {
+  const d = job.drive || {};
+  $("driveLink").hidden = d.status !== "done";
+  if (d.url) $("driveLink").href = d.url;
+  $("drive").hidden = !finished || !done || d.status === "done";
+  $("drive").disabled = d.status === "uploading";
+  $("drive").textContent = d.status === "uploading" ? "Saving to Drive"
+    : d.status === "failed" ? "Try Drive again" : "Save to Google Drive";
+  $("driveMsg").textContent = d.status === "failed" ? d.error : "";
+}
+$("drive").onclick = async () => {
+  job.drive = { status: "uploading" }; render();
+  try { await api(`/api/drive/${job.id}`, { method: "POST" }); }
+  catch (e) { job.drive = { status: "failed", error: e.message }; render(); return; }
+  clearInterval(timer); timer = setInterval(poll, 1500);
+};
+
+$("list").onclick = (e) => {
+  const clip = e.target.closest(".clip[data-file]");
+  if (clip) api("/api/reveal", { method: "POST", body: JSON.stringify({ path: clip.dataset.file }) });
+};
+$("openFolder").onclick = () => job && api("/api/reveal", { method: "POST", body: JSON.stringify({ path: job.folder }) });
+$("retry").onclick = async () => {
+  await api(`/api/retry/${job.id}`, { method: "POST" });
+  clearInterval(timer); timer = setInterval(poll, 1200); poll();
+};
+</script>
+</body>
+</html>

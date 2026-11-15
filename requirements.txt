@@ -1,0 +1,4 @@
+requests
+openpyxl
+yt-dlp
+imageio-ffmpeg
