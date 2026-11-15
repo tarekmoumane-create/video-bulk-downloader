@@ -60,6 +60,14 @@
   .sheet-row input { flex: 1; min-width: 0; }
   .hint { color: var(--dim); font-size: 13px; margin: 0; padding: 0 16px 14px; max-width: 64ch; }
   .sheet-hint { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 12px; }
+  .sheet-hint a { color: var(--muted); }
+  .sheet-hint a:hover { color: var(--ink); }
+  .locked { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px;
+            min-height: 220px; padding: 16px; }
+  .lock-title { margin: 0; color: var(--ink); font-weight: 500; }
+  .lock-sub { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+  .note { color: var(--muted); font-size: 14px; margin: 12px 2px 0; }
+  .note:empty { display: none; }
 
   .drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
           min-height: 220px; margin: 0; border: 1px dashed var(--line-strong); border-radius: 8px;
@@ -155,11 +163,18 @@
       </div>
 
       <div class="pane" id="sheet">
-        <div class="sheet-row">
-          <input type="text" id="sheetUrl" aria-label="Google Sheet link" placeholder="Paste a Google Sheet link">
-          <button class="btn" id="sheetBtn">Find links</button>
+        <div class="locked" id="sheetLocked">
+          <p class="lock-title">Pull links straight from a Google Sheet.</p>
+          <p class="lock-sub">$4.99 a month. Cancel anytime.</p>
+          <button class="btn" id="unlockBtn">Unlock Google Sheet</button>
         </div>
-        <p class="hint sheet-hint">The sheet needs to be shared as "Anyone with the link", or live in your own Google account. Video links are found for you.</p>
+        <div id="sheetOpen" hidden>
+          <div class="sheet-row">
+            <input type="text" id="sheetUrl" aria-label="Google Sheet link" placeholder="Paste a Google Sheet link">
+            <button class="btn" id="sheetBtn">Find links</button>
+          </div>
+          <p class="hint sheet-hint">The sheet needs to be shared as "Anyone with the link", or live in your own Google account. Video links are found for you. <a href="#" id="manageLink">Manage subscription</a></p>
+        </div>
       </div>
 
       <div class="pane" id="file">
@@ -177,6 +192,7 @@
       </div>
     </section>
     <p class="msg" id="msg" role="alert"></p>
+    <p class="note" id="note" role="status"></p>
   </div>
 
   <section id="results" aria-live="polite">
@@ -227,9 +243,41 @@ $("pasteBox").addEventListener("input", () => {
 async function api(path, opts = {}) {
   const r = await fetch(path, opts);
   const data = await r.json().catch(() => ({}));
+  if (r.status === 402) showPlan(false);
   if (!r.ok) throw new Error(data.error || "The tool stopped responding. Close the tab and open the app again.");
   return data;
 }
+
+// ---- Google Sheet subscription
+function showPlan(sheets) {
+  $("sheetLocked").hidden = sheets;
+  $("sheetOpen").hidden = !sheets;
+}
+api("/api/plan").then((p) => showPlan(p.sheets)).catch(() => showPlan(false));
+
+const back = new URLSearchParams(location.search).get("sheets");
+if (back) {
+  history.replaceState(null, "", "/");
+  document.querySelector('.tab[data-pane="sheet"]').click();
+  $("note").textContent = {
+    unlocked: "Google Sheet is unlocked. Thanks for subscribing.",
+    pending: "Payment is still going through. Give it a minute, then reopen the app.",
+    cancelled: "",
+  }[back] || "";
+}
+
+async function goTo(path, btn, busy) {
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = busy; say("");
+  try {
+    const { url } = await api(path, { method: "POST" });
+    location.href = url;
+  } catch (e) {
+    say(e.message); btn.disabled = false; btn.textContent = label;
+  }
+}
+$("unlockBtn").onclick = () => goTo("/api/unlock", $("unlockBtn"), "Opening checkout");
+$("manageLink").onclick = (e) => { e.preventDefault(); goTo("/api/manage", $("manageLink"), "Opening"); };
 
 $("sheetBtn").onclick = async () => {
   const url = $("sheetUrl").value.trim();

@@ -25,3 +25,4 @@ dist/
 
 # Local editor config
 .claude/
+license.json

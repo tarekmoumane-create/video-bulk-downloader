@@ -25,6 +25,13 @@ The first time, right-click the app and choose Open (it isn't signed by Apple).
 On first open it sets itself up (needs Python 3.9+, about a minute), then opens in your browser.
 No API keys or accounts are needed.
 
+## Pricing
+
+Pasting links and uploading files is free. Importing straight from a Google Sheet is $4.99 a month,
+paid through Stripe Checkout from the Google Sheet tab. The app stores only a subscription key in
+`~/Library/Application Support/Video Downloader/license.json` and checks it against the website's
+`/api/license` endpoint. Set `VBD_API` to point the app at a different backend.
+
 Build the app yourself with `./mac/build.sh`.
 
 ## Run from source

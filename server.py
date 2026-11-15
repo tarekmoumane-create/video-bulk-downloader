@@ -22,7 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import shutil
 
@@ -56,6 +56,72 @@ def find_ffmpeg():
 
 
 FFMPEG = find_ffmpeg()
+
+# ---------------------------------------------------------------- Google Sheet subscription
+# Google Sheet import is $4.99/month. Payments and the Stripe key live on the
+# website's server; this app only keeps the subscriber's key and asks that
+# server whether it's still active.
+LICENSE_API = os.environ.get("VBD_API", "https://video-downloader-site.vercel.app/api").rstrip("/")
+LICENSE_FILE = DATA_DIR / "license.json"
+RECHECK_S = 6 * 3600      # ask the server at most every 6 hours
+OFFLINE_GRACE_S = 7 * 86400  # keep working offline for a week after the last good check
+
+
+def load_license() -> dict:
+    try:
+        return json.loads(LICENSE_FILE.read_text())
+    except Exception:
+        return {}
+
+
+def save_license(lic: dict):
+    LICENSE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    LICENSE_FILE.write_text(json.dumps(lic))
+
+
+def sheets_unlocked(force: bool = False) -> bool:
+    lic = load_license()
+    if not lic.get("key"):
+        return False
+    now = time.time()
+    if not force and now - lic.get("checked", 0) < RECHECK_S:
+        return bool(lic.get("active"))
+    try:
+        r = requests.get(f"{LICENSE_API}/license", params={"key": lic["key"]}, timeout=10)
+        r.raise_for_status()
+        lic.update(active=bool(r.json().get("active")), checked=now)
+        if lic["active"]:
+            lic["last_ok"] = now
+        save_license(lic)
+        return lic["active"]
+    except Exception:
+        return bool(lic.get("active")) and now - lic.get("last_ok", 0) < OFFLINE_GRACE_S
+
+
+def license_url(path: str, payload: dict = None) -> str:
+    try:
+        r = requests.post(f"{LICENSE_API}/{path}", json=payload or {}, timeout=20)
+        data = r.json()
+        if r.ok and data.get("url"):
+            return data["url"]
+    except Exception:
+        pass
+    raise ValueError("Couldn't reach checkout. Check your internet and try again.")
+
+
+def finish_checkout(session_id: str) -> str:
+    """Called when Stripe sends the buyer back. Returns where to send them next."""
+    try:
+        r = requests.get(f"{LICENSE_API}/license", params={"session_id": session_id}, timeout=15)
+        data = r.json()
+    except Exception:
+        return "/?sheets=pending"
+    if not data.get("key"):
+        return "/?sheets=pending"
+    now = time.time()
+    save_license({"key": data["key"], "active": bool(data.get("active")), "checked": now,
+                  **({"last_ok": now} if data.get("active") else {})})
+    return "/?sheets=unlocked" if data.get("active") else "/?sheets=pending"
 
 VIDEO_RE = re.compile(
     # TikTok
@@ -310,6 +376,13 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
         elif path == "/api/ping":
             self.send_json({"ok": True})
+        elif path == "/api/plan":
+            self.send_json({"sheets": sheets_unlocked(), "price": "$4.99/month"})
+        elif path == "/unlocked":
+            session_id = (parse_qs(urlparse(self.path).query).get("session_id") or [""])[0]
+            self.send_response(302)
+            self.send_header("Location", finish_checkout(session_id) if session_id else "/")
+            self.end_headers()
         elif path.startswith("/api/job/"):
             job = JOBS.get(path.rsplit("/", 1)[-1])
             if not job:
@@ -323,7 +396,17 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/sheet":
                 url = json.loads(self.body()).get("url", "")
+                if not sheets_unlocked():
+                    return self.send_json(
+                        {"error": "Google Sheet import needs a subscription ($4.99/month)."}, 402)
                 self.send_json({"links": links_from_sheet(url)})
+            elif path == "/api/unlock":
+                self.send_json({"url": license_url("checkout")})
+            elif path == "/api/manage":
+                key = load_license().get("key")
+                if not key:
+                    return self.send_json({"error": "No subscription on this Mac."}, 400)
+                self.send_json({"url": license_url("portal", {"key": key})})
             elif path == "/api/file":
                 name = self.headers.get("X-Filename", "file.csv")
                 self.send_json({"links": links_from_file(name, self.body())})
