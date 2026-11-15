@@ -61,7 +61,7 @@ FFMPEG = find_ffmpeg()
 # Google Sheet import is $4.99/month. Payments and the Stripe key live on the
 # website's server; this app only keeps the subscriber's key and asks that
 # server whether it's still active.
-LICENSE_API = os.environ.get("VBD_API", "https://video-downloader-site.vercel.app/api").rstrip("/")
+LICENSE_API = os.environ.get("VBD_API", "https://video-bulk-downloader-site.vercel.app/api").rstrip("/")
 LICENSE_FILE = DATA_DIR / "license.json"
 RECHECK_S = 6 * 3600      # ask the server at most every 6 hours
 OFFLINE_GRACE_S = 7 * 86400  # keep working offline for a week after the last good check
